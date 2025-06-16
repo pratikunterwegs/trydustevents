@@ -8,7 +8,7 @@ sirode <- structure(
   parameters = data.frame(
     name = c("I0", "N", "beta", "gamma"),
     type = c("real_type", "real_type", "real_type", "real_type"),
-    constant = c(FALSE, TRUE, FALSE, FALSE)),
+    constant = c(TRUE, TRUE, TRUE, TRUE)),
   properties = list(
     time_type = "continuous",
     has_compare = FALSE,

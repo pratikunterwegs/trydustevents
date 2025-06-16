@@ -10,7 +10,13 @@ run_model = function(
 ) {
   # create a dust2 system
   sys = dust2::dust_system_create(
-    sirode
+    sirode,
+    list(
+      I0 = I0,
+      N = N,
+      beta = beta,
+      gamma = gamma
+    )
   )
 
   state = c(N, I0, 0)
