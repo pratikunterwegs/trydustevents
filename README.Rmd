@@ -27,6 +27,18 @@ You can install the development version of trydustevents from [GitHub](https://g
 pak::pak("pratikunterwegs/trydustevents")
 ```
 
+## Get started
+
+The model has defaults that show event functionality; the NPI event is active from day 30 -- day 60.
+
+```{r}
+library(trydustevents)
+
+data = run_model()
+
+plot(data$I)
+```
+
 ## Modifying ODEs
 
 This is a multi-step process involving a `dust2` object:

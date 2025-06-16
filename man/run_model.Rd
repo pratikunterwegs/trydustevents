@@ -4,7 +4,15 @@
 \alias{run_model}
 \title{Run a simple SIR model}
 \usage{
-run_model(I0 = 10, N = 1000, beta = 0.2, gamma = 0.1, time_end = 100)
+run_model(
+  I0 = 10,
+  N = 1000,
+  beta = 0.2,
+  gamma = 0.1,
+  event_time_on = 30,
+  event_time_off = 60,
+  time_end = 100
+)
 }
 \description{
 Run a simple SIR model
