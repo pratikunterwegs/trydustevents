@@ -31,5 +31,8 @@ run_model <- function(
   state <- dust2::dust_system_simulate(sys, seq(0, time_end))
 
   # unpack the ODE state and return
-  dust2::dust_unpack_state(sys, state)
+  list(
+    data = dust2::dust_unpack_state(sys, state),
+    events = dust2::dust_system_internals(sys)[["events"]]
+  )
 }

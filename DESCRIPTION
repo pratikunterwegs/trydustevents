@@ -15,5 +15,5 @@ LinkingTo:
 Imports: 
     dust2
 Remotes:
-    mrc-ide/dust2,
+    mrc-ide/dust2@mrc-6413,
     mrc-ide/monty
