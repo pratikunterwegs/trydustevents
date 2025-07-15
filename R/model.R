@@ -6,6 +6,7 @@ run_model <- function(
   N = 1000,
   beta = 0.2,
   gamma = 0.1,
+  infect_cap = 100.0,
   event_time_on = 30,
   event_time_off = 60,
   time_end = 100
@@ -18,6 +19,7 @@ run_model <- function(
       N = N,
       beta = beta,
       gamma = gamma,
+      infect_cap = infect_cap,
       event_time_on = event_time_on,
       event_time_off = event_time_off
     )
