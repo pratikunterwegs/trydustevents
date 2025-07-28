@@ -21,7 +21,7 @@ public:
   // shared model parameters
   struct shared_state {
     real_type N, I0, beta, gamma, infect_cap, event_time_on, event_time_off;
-    size_t i_flag;
+    size_t i_flag_1, i_flag_2;
   };
 
   // scratch space, not used here
@@ -32,11 +32,12 @@ public:
 
   // specify how the data should be returned
   static dust2::packing packing_state(const shared_state &shared) {
-    return dust2::packing{{"S", {}}, {"I", {}}, {"R", {}}, {"flag1", {}}};
+    return dust2::packing{
+        {"S", {}}, {"I", {}}, {"R", {}}, {"flag1", {}}, {"flag2", {}}};
   }
 
   static size_t size_special() {
-    return 1; // flag
+    return 2; // flag
   }
 
   // pass model params from R to C++
@@ -55,12 +56,13 @@ public:
         dust2::r::read_real(pars, "event_time_off", NA_REAL);
 
     // index of the flag
-    const size_t i_flag = 3; // hard-coded, comes after S, I, R, 0-indexed
+    const size_t i_flag_1 = 3; // hard-coded, comes after S, I, R, 0-indexed
+    const size_t i_flag_2 = 4;
 
     // clang-format off
     return shared_state{
       N, I0, beta, gamma, infect_cap, event_time_on, event_time_off,
-      i_flag
+      i_flag_1, i_flag_2
     };
     // clang-format on
   }
@@ -86,8 +88,8 @@ public:
     const auto S = state[0];
     const auto I = state[1];
 
-    // when the event (NPI) is on, reduce beta to 50%
-    const double beta_now = shared.beta * (1.0 - 0.5 * state[shared.i_flag]);
+    // when the event (NPI) is on, increase beta to 200%
+    const double beta_now = shared.beta * (1.0 + 1.0 * state[shared.i_flag_2]);
 
     const auto rate_SI = beta_now * S * I / shared.N;
     const auto rate_IR = shared.gamma * I;
@@ -116,12 +118,12 @@ public:
 
     // make a function that changes a flag value to on
     auto fn_flag_on = [&](const double t, const double sign, double *y) {
-      y[shared.i_flag] = 1.0;
+      y[shared.i_flag_2] = 1.0;
     };
 
     // function to switch flag off
     auto fn_flag_off = [&](const double t, const double sign, double *y) {
-      y[shared.i_flag] = 0.0;
+      y[shared.i_flag_2] = 0.0;
     };
 
     // a dummy function, not used
