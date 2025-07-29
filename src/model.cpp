@@ -35,12 +35,12 @@ public:
 
   // specify how the data should be returned
   static dust2::packing packing_state(const shared_state &shared) {
-    return dust2::packing{
-        {"S", {}}, {"I", {}}, {"R", {}}, {"flag1", {}}, {"flag2", {}}};
+    return dust2::packing{{"S", {}},   {"I", {}},     {"R", {}},
+                          {"ipr", {}}, {"flag1", {}}, {"flag2", {}}};
   }
 
   static size_t size_special() {
-    return 2; // flag
+    return 2; // flags
   }
 
   // pass model params from R to C++
@@ -82,7 +82,10 @@ public:
     state_next[0] = shared.N - shared.I0;
     state_next[1] = shared.I0;
     state_next[2] = 0.0;
-    state_next[3] = 0.0; // events initialised as off
+    state_next[3] = 0.0; // IPR initialised as 0.0
+    // flags init as 0
+    state_next[4] = 0.0;
+    state_next[5] = 0.0;
   }
 
   // RHS of ODE
@@ -91,6 +94,7 @@ public:
                   real_type *state_deriv) {
     const auto S = state[0];
     const auto I = state[1];
+    const auto old_ipr = state[3];
 
     // when the event is on, allow vaccination
     const double nu_now = shared.nu;
@@ -99,9 +103,12 @@ public:
     const auto rate_IR = shared.gamma * I;
     const auto rate_SR = nu_now * S;
 
+    const auto ipr = (rate_SI / I) - old_ipr;
+
     state_deriv[0] = -rate_SI;
     state_deriv[1] = rate_SI - rate_IR;
     state_deriv[2] = rate_IR + rate_SR;
+    state_deriv[3] = ipr;
   }
 
   // model events; this uses manual dust2 events
@@ -113,8 +120,12 @@ public:
       return t - shared.event_time_on;
     };
 
-    auto fn_state_test = [&](const double t, const double *y) {
+    auto fn_state_test_on = [&](const double t, const double *y) {
       return y[0] - shared.infect_cap;
+    };
+
+    auto fn_state_test_off = [&](const double t, const double *y) {
+      return y[0] - shared.gamma;
     };
 
     auto fn_time_test_off = [&](const double t, const double *y) {
@@ -148,18 +159,24 @@ public:
     // an event that launches when 100 individuals are in I
     std::string name_state_on = "event_state_on";
     dust2::ode::event<real_type> event_state_on(
-        name_state_on, {1}, fn_state_test, fn_dummy_action,
+        name_state_on, {1}, fn_state_test_on, fn_dummy_action,
         dust2::ode::root_type::increase);
 
+    // even that ends when IPR hits gamma while decreasing
     std::string name_state_off = "event_state_off";
     dust2::ode::event<real_type> event_state_off(
-        name_state_off, {1}, fn_state_test, fn_dummy_action,
+        name_state_off, {3}, fn_state_test_off, fn_dummy_action,
         dust2::ode::root_type::decrease);
 
     // return events vector
     return dust2::ode::events_type<real_type>(
         {event_time_on, event_time_off, event_state_on, event_state_off});
   }
+
+  // static auto zero_every(const shared_state &shared) {
+  //   return dust2::zero_every_type<real_type>{
+  //       {1, {3}}};  // zero IPR value
+  // }
 };
 
 #include <cpp11.hpp>

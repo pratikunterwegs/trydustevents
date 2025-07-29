@@ -29,7 +29,8 @@ run_model <- function(
 
   state <- c(N, I0, 0)
   flags <- c(0.0, 0.0) # flag is part of state
-  dust2::dust_system_set_state(sys, c(state, flags))
+  ipr <- 0
+  dust2::dust_system_set_state(sys, c(state, ipr, flags))
 
   # simulate with default values
   state <- dust2::dust_system_simulate(sys, seq(0, time_end))
