@@ -9,6 +9,7 @@
 // [[dust2::parameter(N, constant = TRUE)]]
 // [[dust2::parameter(beta, constant = TRUE)]]
 // [[dust2::parameter(gamma, constant = TRUE)]]
+// [[dust2::parameter(nu, constant = TRUE)]]
 // [[dust2::parameter(infect_cap, constant = TRUE)]]
 // [[dust2::parameter(event_time_on, constant = TRUE)]]
 // [[dust2::parameter(event_time_off, constant = TRUE)]]
@@ -20,7 +21,7 @@ public:
 
   // shared model parameters
   struct shared_state {
-    real_type N, I0, beta, gamma, infect_cap, event_time_on, event_time_off;
+    real_type N, I0, beta, gamma, nu, infect_cap, event_time_on, event_time_off;
     size_t i_flag_1, i_flag_2;
   };
 
@@ -46,6 +47,7 @@ public:
     const real_type N = dust2::r::read_real(pars, "N", 1000.0);
     const real_type beta = dust2::r::read_real(pars, "beta", 0.2);
     const real_type gamma = dust2::r::read_real(pars, "gamma", 0.1);
+    const real_type nu = dust2::r::read_real(pars, "nu", 0.2);
 
     // trigger NPI on 100 infections by default
     const real_type infect_cap = dust2::r::read_real(pars, "infect_cap", 100.0);
@@ -61,7 +63,7 @@ public:
 
     // clang-format off
     return shared_state{
-      N, I0, beta, gamma, infect_cap, event_time_on, event_time_off,
+      N, I0, beta, gamma, nu, infect_cap, event_time_on, event_time_off,
       i_flag_1, i_flag_2
     };
     // clang-format on
@@ -88,15 +90,16 @@ public:
     const auto S = state[0];
     const auto I = state[1];
 
-    // when the event (NPI) is on, increase beta to 200%
-    const double beta_now = shared.beta * (1.0 + 1.0 * state[shared.i_flag_2]);
+    // when the event is on, allow vaccination
+    const double nu_now = shared.nu;
 
-    const auto rate_SI = beta_now * S * I / shared.N;
+    const auto rate_SI = shared.beta * S * I / shared.N;
     const auto rate_IR = shared.gamma * I;
+    const auto rate_SR = nu_now * S;
 
     state_deriv[0] = -rate_SI;
     state_deriv[1] = rate_SI - rate_IR;
-    state_deriv[2] = rate_IR;
+    state_deriv[2] = rate_IR + rate_SR;
   }
 
   // model events; this uses manual dust2 events
@@ -143,12 +146,12 @@ public:
     // an event that launches when 100 individuals are in I
     std::string name_state_on = "event_state_on";
     dust2::ode::event<real_type> event_state_on(
-        name_state_on, {1}, fn_state_test, fn_flag_on,
+        name_state_on, {1}, fn_state_test, fn_dummy_action,
         dust2::ode::root_type::increase);
 
     std::string name_state_off = "event_state_off";
     dust2::ode::event<real_type> event_state_off(
-        name_state_off, {1}, fn_state_test, fn_flag_off,
+        name_state_off, {1}, fn_state_test, fn_dummy_action,
         dust2::ode::root_type::decrease);
 
     // return events vector

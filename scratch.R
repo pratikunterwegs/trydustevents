@@ -2,10 +2,25 @@ dust2::dust_package(".")
 devtools::load_all()
 
 # starting early: no state threshold crossed
+reprex::reprex(
+  {
+    library(trydustevents)
+    
+    # system has two flags, flag_1 and flag_2
+    # time-dependent event at t = 25 changes flag_2 to boost infection rate
+    # this triggers state-dependent event to launch in the same timestep
+    o = run_model(
+      infect_cap = 100,
+      event_time_on = 20
+    )
+    o$events
+  }
+)
 o = run_model(
   event_time_on = 25
 )
-o
+o$events
+
 plot(o$data$I, type = "l")
 
 # starting a bit later: weird, roots are completely off
@@ -33,3 +48,19 @@ o
 
 plot(o$data$I, type = "l")
 abline(h = 100, col = 2)
+
+reprex::reprex(
+  {
+    library(trydustevents)
+
+    # starting a bit later: weird, roots are completely off
+    o = run_model(
+      event_time_on = 70,
+      event_time_off = NULL
+    )
+    o$events
+    plot(o$data$I, type = "l")
+    abline(h = 100, col = 2)
+    abline(v = tail(o$events[[1]]$time, 1) + 1)
+  }
+)
