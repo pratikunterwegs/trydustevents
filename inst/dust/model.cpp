@@ -33,13 +33,20 @@ public:
 
   // specify how the data should be returned
   static dust2::packing packing_state(const shared_state &shared) {
-    return dust2::packing{{"S", {}},   {"I", {}},     {"R", {}},
-                          {"ipr", {}}, {"flag1", {}}, {"flag2", {}}};
+    return dust2::packing{{"S", {}},
+                          {"I", {}},
+                          {"R", {}},
+                          {"ipr", {}},
+                          {"ipr_est", {}},
+                          {"flag1", {}},
+                          {"flag2", {}}};
   }
 
   static size_t size_special() {
     return 2; // flags
   }
+
+  static size_t size_output() { return 1; }
 
   // pass model params from R to C++
   static shared_state build_shared(cpp11::list pars) {
@@ -79,34 +86,46 @@ public:
                       real_type *state_next) {
     state_next[0] = shared.N - shared.I0;
     state_next[1] = shared.I0;
-    state_next[2] = 0.0;
-    state_next[3] = 0.0; // IPR initialised as 0.0
+    state_next[2] = 0;
+    state_next[3] = 0; // IPR initialised as 0.0
+
     // flags init as 0
-    state_next[4] = 0.0;
     state_next[5] = 0.0;
+    state_next[6] = 0.0;
   }
 
   // RHS of ODE
   static void rhs(real_type time, const real_type *state,
                   const shared_state &shared, internal_state &internal,
                   real_type *state_deriv) {
-    const auto S = state[0];
-    const auto I = state[1];
-    const auto old_ipr = state[3];
+    const real_type S = state[0];
+    const real_type I = state[1];
 
     // when the event is on, allow vaccination
     const double nu_now = shared.nu;
 
-    const auto rate_SI = shared.beta * S * I / shared.N;
-    const auto rate_IR = shared.gamma * I;
-    const auto rate_SR = nu_now * S;
+    const real_type rate_SI = shared.beta * S * I / shared.N;
+    const real_type rate_IR = shared.gamma * I;
+    const real_type rate_SR = nu_now * S;
 
-    const auto ipr = (rate_SI / I) - old_ipr;
+    const real_type ipr = (rate_SI / I);
 
     state_deriv[0] = -rate_SI;
     state_deriv[1] = rate_SI - rate_IR;
     state_deriv[2] = rate_IR + rate_SR;
     state_deriv[3] = ipr;
+  }
+
+  static void output(real_type time, real_type *state,
+                     const shared_state &shared, internal_state &internal) {
+    const auto ipr = state[3];
+    real_type temp_time = std::fmod(time, 1);
+    if (temp_time < 1e-6) {
+      temp_time = 1.0;
+    }
+
+    const real_type ipr_est = ipr / temp_time;
+    state[4] = ipr_est;
   }
 
   // model events; this uses manual dust2 events
@@ -163,7 +182,7 @@ public:
     // even that ends when IPR hits gamma while decreasing
     std::string name_state_off = "event_state_off";
     dust2::ode::event<real_type> event_state_off(
-        name_state_off, {3}, fn_state_test_off, fn_dummy_action,
+        name_state_off, {4}, fn_state_test_off, fn_dummy_action,
         dust2::ode::root_type::decrease);
 
     // return events vector
@@ -171,8 +190,7 @@ public:
         {event_time_on, event_time_off, event_state_on, event_state_off});
   }
 
-  // static auto zero_every(const shared_state &shared) {
-  //   return dust2::zero_every_type<real_type>{
-  //       {1, {3}}};  // zero IPR value
-  // }
+  static auto zero_every(const shared_state &shared) {
+    return dust2::zero_every_type<real_type>{{1, {3}}}; // zero IPR value
+  }
 };
