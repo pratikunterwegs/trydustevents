@@ -24,16 +24,18 @@ run_model <- function(
       infect_cap = infect_cap,
       event_time_on = event_time_on,
       event_time_off = event_time_off
-    )
+    ),
+    deterministic = TRUE
   )
 
   state <- c(N, I0, 0)
   flags <- c(0.0, 0.0) # flag is part of state
-  ipr <- c(0, 0, 0)
-  dust2::dust_system_set_state(sys, c(state, ipr, flags))
+  r0 <- beta * (1 / gamma)
+  rt <- c(r0, r0, r0)
+  dust2::dust_system_set_state(sys, c(state, rt, flags))
 
   # simulate with default values
-  state <- dust2::dust_system_simulate(sys, seq(0, time_end))
+  state <- dust2::dust_system_simulate(sys, seq(0, time_end, 0.5))
 
   # unpack the ODE state and return
   list(
