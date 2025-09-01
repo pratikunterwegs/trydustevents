@@ -6,9 +6,9 @@ sirode <- structure(
   package = "trydustevents",
   path = NULL,
   parameters = data.frame(
-    name = c("I0", "N", "beta", "gamma", "nu", "infect_cap", "event_time_on", "event_time_off"),
-    type = c("real_type", "real_type", "real_type", "real_type", "real_type", "real_type", "real_type", "real_type"),
-    constant = c(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE)),
+    name = c("I0", "N", "beta", "gamma", "infect_cap", "event_time_on", "event_time_off"),
+    type = c("real_type", "real_type", "real_type", "real_type", "real_type", "real_type", "real_type"),
+    constant = c(TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE)),
   properties = list(
     time_type = "continuous",
     has_compare = FALSE,

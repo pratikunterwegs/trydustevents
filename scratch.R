@@ -2,15 +2,17 @@ dust2::dust_package(".")
 devtools::load_all()
 
 o <- run_model(
-  event_time_on = 100,
+  event_time_on = 10,
   event_time_off = 100,
-  time_end = 70
+  time_end = 50
 )
 o$events
 
-o$data$ipr
-o$data$ipr_est
+o$data$rt_cumul
+o$data$rt_est
+o$data$rt_saved
+o$data$flag
 
-plot(o$data$ipr, type = "s")
-lines(o$data$ipr_est, col = "red", type = "l")
+plot(o$data$rt_est, type = "s")
+lines(o$data$rt_saved, col = "red", type = "l")
 abline(h = 0.1, col = "blue")
