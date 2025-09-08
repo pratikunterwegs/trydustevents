@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <dust2/common.hpp>
 
-const int state_size = 6L;
+const int state_size = 5L;
 
 // [[dust2::class(sirode)]]
 // [[dust2::time_type(continuous)]]
@@ -38,12 +38,11 @@ public:
   // specify how the data should be returned
   static dust2::packing packing_state(const shared_state &shared) {
     return dust2::packing{{"S", {}},        {"I", {}},      {"R", {}},
-                          {"rt_cumul", {}}, {"rt_est", {}}, {"rt_saved", {}},
-                          {"flag", {}}};
+                          {"rt_cumul", {}}, {"rt_est", {}}, {"flag", {}}};
   }
 
   static size_t size_special() {
-    return 2; // rt_saved and flags
+    return 1; // rt_saved and flags
   }
 
   // pass model params from R to C++
@@ -61,9 +60,12 @@ public:
     const real_type event_time_off =
         dust2::r::read_real(pars, "event_time_off", NA_REAL);
 
+    Rprintf("time on = %f\n", event_time_on);
+    Rprintf("time off = %f\n", event_time_off);
+
     // index of the flag
     const size_t i_flag =
-        state_size; // hard-coded, comes after S, I, R, Rts, 0-indexed
+        state_size; // hard-coded, comes after S, I, R, Rt_cumul, Rt_est
 
     // clang-format off
     return shared_state{
@@ -90,10 +92,9 @@ public:
 
     state_next[3] = rt; // rt_cumul
     state_next[4] = rt; // rt_est
-    // state_next[5] = rt; // rt_saved
 
     // flags init as 0
-    state_next[6] = 0.0;
+    state_next[5] = 0.0;
   }
 
   // RHS of ODE
@@ -118,34 +119,34 @@ public:
   // model events; this uses manual dust2 events
   static auto events(const shared_state &shared,
                      const internal_state &internal) {
-    // make a function that tests for time as integerish
-    auto fn_time_test_integer = [&](const double t, const double *y) {
-      const double time_mod = std::fmod(t, 1.0);
-      const bool is_t_integerish = time_mod < 1e-3;
-
-      if (is_t_integerish) {
-        return 0.0;
-      } else {
-        return 1.0;
-      }
-    };
-
     // check the first element of the array pointer y against infect_cap
     // NOTE: the way dust2 events work is that the condition function works on
-    // a pointer to an array comprising of user-specified indices (how does it
-    // handle non-contiguous indices - unclear), so the starting index i0 is
-    // accessed in the condition function as 0.
+    // a pointer to an array comprising of user-specified indices, so the
+    // starting index i0 is accessed in the condition function as 0.
+
     // NOTE: the action function does not work this way, it accesses the whole
     // state array.
     auto fn_state_test_on = [&](const double t, const double *y) {
-      const double sum_infected = std::accumulate(y, y + 1, 0);
-      Rprintf("sum_infected = %f \n", sum_infected);
-      return sum_infected - shared.infect_cap;
+      const double infected = y[0]; // using local index, y[0] != state[0]
+      // const double flag_value = y[0];
+      // Rprintf("t = %f, flag = %f\n", t, flag_value);
+      return infected - shared.infect_cap;
     };
 
+    // NOTE: this doesn't work because Rt_est is reset in each timestep
+    // NOTE: daedalus branch jidea-305 contains a potential fix
     auto fn_state_test_off = [&](const double t, const double *y) {
-      const double diff = y[0] - 1.0; // rt < 1.0
+      const double diff = y[0] - 1.0; // rt < 1.0?
       return diff < 0.0 ? 0.0 : 1.0;
+    };
+
+    // function to test for time on and time off
+    auto fn_time_test_on = [&](const double t, const double *y) {
+      return t - shared.event_time_on;
+    };
+
+    auto fn_time_test_off = [&](const double t, const double *y) {
+      return t - shared.event_time_off;
     };
 
     // make a function that changes a flag value to on
@@ -160,12 +161,7 @@ public:
 
     // a dummy function, not used
     auto fn_dummy_action = [&](const double t, const double sign, double *y) {
-      Rprintf("Action at time = %f \n", t);
-    };
-
-    // save rt estimated to r_saved, refer to absolute positions in y
-    auto fn_save_internal = [&](const double t, const double sign, double *y) {
-      y[5] = y[4];
+      Rprintf("Action at time = %f\n", t);
     };
 
     // an event that launches when 100 individuals are in I
@@ -173,36 +169,45 @@ public:
     dust2::ode::event<real_type> event_state_on(name_state_on, {1},
                                                 fn_state_test_on, fn_flag_on);
 
-    // even that ends when Rt_saved hits 1 while decreasing
+    // event that ends when Rt_saved hits 1 while decreasing
     std::string name_state_off = "event_state_off";
     dust2::ode::event<real_type> event_state_off(
-        name_state_off, {5}, fn_state_test_off, fn_flag_off);
+        name_state_off, {4}, fn_state_test_off, fn_flag_off);
 
-    // event that triggers when time is integerish
-    std::string name_time_integer = "event_time_integer";
-    dust2::ode::event<real_type> event_time_integer(
-        name_time_integer, {}, fn_time_test_integer, fn_save_internal);
+    // event that starts at a specific time: no action
+    std::string name_time_on = "event_time_on";
+    dust2::ode::event<real_type> event_time_on(name_time_on, {},
+                                               fn_time_test_on, fn_dummy_action,
+                                               dust2::ode::root_type::increase);
+
+    std::string name_time_off = "event_time_off";
+    dust2::ode::event<real_type> event_time_off(
+        name_time_off, {}, fn_time_test_off, fn_dummy_action,
+        dust2::ode::root_type::increase);
 
     // return events vector
     return dust2::ode::events_type<real_type>(
-        {event_state_on, event_state_off});
+        {event_state_on, event_state_off, event_time_on, event_time_off});
   }
 
-  static size_t size_output() { return 1; }
-
+  /* USING DELAYS AND OUTPUT*/
+  // using delays functionality
   static auto delays(const shared_state &shared) {
     return dust2::ode::delays<real_type>({{1, {{3, 1}}}});
   }
 
+  // using output functionality
+  static size_t size_output() { return 1; }
   static void output(real_type time, real_type *state,
                      const shared_state &shared, internal_state &internal,
                      const dust2::ode::delay_result_type<real_type> &delays) {
     const auto &delay_rt = delays[0].data[0];
-    state[4] = state[3] - delay_rt;
+    state[4] = state[3] - delay_rt; // log the instantaneous Rt
   }
 
+  // zero the instantaneous Rt at each timestep
   static auto zero_every(const shared_state &shared) {
-    return dust2::zero_every_type<real_type>{{1, {4}}}; // zero IPR value
+    return dust2::zero_every_type<real_type>{{1, {4}}}; // zero Rt value
   }
 };
 

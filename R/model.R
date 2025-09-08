@@ -31,7 +31,7 @@ run_model <- function(
   state <- c(N, I0, 0)
   flags <- c(0.0) # flag is part of state
   r0 <- beta * (1 / gamma)
-  rt <- c(r0, r0, r0)
+  rt <- c(r0, r0)
   dust2::dust_system_set_state(sys, c(state, rt, flags))
 
   # simulate with default values
