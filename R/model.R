@@ -6,7 +6,6 @@ run_model <- function(
   N = 1000,
   beta = 0.2,
   gamma = 0.1,
-  nu = 0.2,
   infect_cap = 100.0,
   event_time_on = 30,
   event_time_off = 60,
@@ -20,7 +19,6 @@ run_model <- function(
       N = N,
       beta = beta,
       gamma = gamma,
-      nu = nu,
       infect_cap = infect_cap,
       event_time_on = event_time_on,
       event_time_off = event_time_off
@@ -30,7 +28,7 @@ run_model <- function(
 
   state <- c(N, I0, 0)
   flags <- c(0.0) # flag is part of state
-  r0 <- beta * (1 / gamma)
+  r0 <- beta / gamma
   rt <- c(r0, r0)
   dust2::dust_system_set_state(sys, c(state, rt, flags))
 

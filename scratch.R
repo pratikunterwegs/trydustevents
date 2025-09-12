@@ -4,13 +4,12 @@ devtools::load_all()
 o <- run_model(
   event_time_on = 10,
   event_time_off = 100,
-  time_end = 50
+  time_end = 150
 )
 o$events
 
 o$data$rt_cumul
 o$data$rt_est
-o$data$rt_saved
 o$data$flag
 
 plot(o$data$rt_est, type = "s")

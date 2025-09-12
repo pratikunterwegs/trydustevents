@@ -23,7 +23,7 @@ public:
 
   // shared model parameters
   struct shared_state {
-    real_type N, I0, beta, gamma, nu, infect_cap, event_time_on, event_time_off;
+    real_type N, I0, beta, gamma, infect_cap, event_time_on, event_time_off;
     size_t i_flag;
   };
 
@@ -40,7 +40,7 @@ public:
   }
 
   static size_t size_special() {
-    return 1; // rt_saved and flags
+    return 1; // flag
   }
 
   // pass model params from R to C++
@@ -58,10 +58,6 @@ public:
     const real_type event_time_off =
         dust2::r::read_real(pars, "event_time_off", NA_REAL);
 
-    Rprintf("time on = %f\n", event_time_on);
-    Rprintf("time off = %f\n", event_time_off);
-
-    // index of the flag
     const size_t i_flag =
         state_size; // hard-coded, comes after S, I, R, Rt_cumul, Rt_est
 
@@ -126,8 +122,6 @@ public:
     // state array.
     auto fn_state_test_on = [&](const double t, const double *y) {
       const double infected = y[0]; // using local index, y[0] != state[0]
-      // const double flag_value = y[0];
-      // Rprintf("t = %f, flag = %f\n", t, flag_value);
       return infected - shared.infect_cap;
     };
 
@@ -149,12 +143,14 @@ public:
 
     // make a function that changes a flag value to on
     auto fn_flag_on = [&](const double t, const double sign, double *y) {
-      y[shared.i_flag] = 1.0;
+      Rprintf("Action at time = %f\n", t);
+      y[state_size] = 1.0;
     };
 
     // function to switch flag off
     auto fn_flag_off = [&](const double t, const double sign, double *y) {
-      y[shared.i_flag] = 0.0;
+      Rprintf("Action at time = %f\n", t);
+      y[state_size] = 0.0;
     };
 
     // a dummy function, not used
@@ -164,23 +160,25 @@ public:
 
     // an event that launches when 100 individuals are in I
     std::string name_state_on = "event_state_on";
-    dust2::ode::event<real_type> event_state_on(name_state_on, {1},
-                                                fn_state_test_on, fn_flag_on);
+    dust2::ode::event<real_type> event_state_on(
+        name_state_on, {1}, fn_state_test_on, fn_flag_on,
+        dust2::ode::root_type::increase);
 
     // event that ends when Rt_saved hits 1 while decreasing
     std::string name_state_off = "event_state_off";
     dust2::ode::event<real_type> event_state_off(
-        name_state_off, {4}, fn_state_test_off, fn_flag_off);
+        name_state_off, {4}, fn_state_test_off, fn_flag_off,
+        dust2::ode::root_type::decrease);
 
     // event that starts at a specific time: no action
     std::string name_time_on = "event_time_on";
     dust2::ode::event<real_type> event_time_on(name_time_on, {},
-                                               fn_time_test_on, fn_dummy_action,
+                                               fn_time_test_on, fn_flag_on,
                                                dust2::ode::root_type::increase);
 
     std::string name_time_off = "event_time_off";
     dust2::ode::event<real_type> event_time_off(
-        name_time_off, {}, fn_time_test_off, fn_dummy_action,
+        name_time_off, {}, fn_time_test_off, fn_flag_off,
         dust2::ode::root_type::increase);
 
     // return events vector
@@ -188,23 +186,22 @@ public:
         {event_state_on, event_state_off, event_time_on, event_time_off});
   }
 
-  /* USING DELAYS AND OUTPUT*/
-  // using delays functionality
-  static auto delays(const shared_state &shared) {
-    return dust2::ode::delays<real_type>({{1, {{3, 1}}}});
-  }
+  /* USING DELAYS AND OUTPUT
+    NOTE: seems to conflict with setting flag in events
+  */
+  // // using delays functionality
+  // static auto delays(const shared_state &shared) {
+  //   return dust2::ode::delays<real_type>({{1, {{3, 1}}}});
+  // }
 
-  // using output functionality
-  static size_t size_output() { return 1; }
-  static void output(real_type time, real_type *state,
-                     const shared_state &shared, internal_state &internal,
-                     const dust2::ode::delay_result_type<real_type> &delays) {
-    const auto &delay_rt = delays[0].data[0];
-    state[4] = state[3] - delay_rt; // log the instantaneous Rt
-  }
+  // // using output functionality
+  // static size_t size_output() { return 1; }
 
-  // zero the instantaneous Rt at each timestep
-  static auto zero_every(const shared_state &shared) {
-    return dust2::zero_every_type<real_type>{{1, {4}}}; // zero Rt value
-  }
+  // static void output(real_type time, real_type *state,
+  //                    const shared_state &shared, internal_state &internal,
+  //                    const dust2::ode::delay_result_type<real_type> &delays)
+  //                    {
+  //   const auto &delay_rt = delays[0].data[0];
+  //   state[4] = state[3] - delay_rt; // log the instantaneous Rt
+  // }
 };
